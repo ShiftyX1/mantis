@@ -279,7 +279,7 @@ export function StepPanel({ step, onClose }: { step: Step; onClose: () => void }
         </div>
 
         <div className="flex-1 overflow-auto min-h-0">
-          <div className="bg-zinc-950 px-4 py-3.5 space-y-1 min-h-[120px]">
+          <div className="bg-zinc-50 dark:bg-zinc-950 px-4 py-3.5 space-y-1 min-h-[120px]">
             {prompt && <PromptBanner prompt={prompt} />}
             {entries.map((entry, i) => <EntryLine key={i} entry={entry} />)}
             {isRunning && !step.result && (
@@ -314,7 +314,7 @@ export function StepPanel({ step, onClose }: { step: Step; onClose: () => void }
               </button>
             </div>
             <div ref={logScrollRef} className="flex-1 overflow-auto min-h-0">
-              <div className="bg-zinc-950 px-4 py-3.5 space-y-1 min-h-[120px]">
+              <div className="bg-zinc-50 dark:bg-zinc-950 px-4 py-3.5 space-y-1 min-h-[120px]">
                 {log?.prompt && <PromptBanner prompt={log.prompt} />}
                 {log && log.entries.length === 0 && log.status === 'running' ? (
                   <div className="font-mono text-xs flex items-center gap-2 text-zinc-500 dark:text-zinc-600 py-2">

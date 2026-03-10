@@ -37,8 +37,8 @@ export function EntryLine({ entry }: { entry: LogEntry }) {
   if (entry.type === 'command') {
     const cmd = parseCommand(entry.content)
     return (
-      <div className="font-mono text-xs leading-relaxed flex gap-3 text-teal-400">
-        <span className="text-zinc-600 shrink-0 select-none">{time}</span>
+      <div className="font-mono text-xs leading-relaxed flex gap-3 text-teal-600 dark:text-teal-400">
+        <span className="text-zinc-500 dark:text-zinc-600 shrink-0 select-none">{time}</span>
         <span className="shrink-0 select-none">$</span>
         <span>{cmd}</span>
       </div>
@@ -48,7 +48,7 @@ export function EntryLine({ entry }: { entry: LogEntry }) {
   if (entry.type === 'output') {
     return (
       <div className="font-mono text-xs leading-relaxed flex gap-3 text-zinc-500 dark:text-zinc-400">
-        <span className="text-zinc-600 shrink-0 select-none">{time}</span>
+        <span className="text-zinc-500 dark:text-zinc-600 shrink-0 select-none">{time}</span>
         <span className="shrink-0 w-3" />
         <pre className="whitespace-pre-wrap break-all m-0">{entry.content}</pre>
       </div>
@@ -57,17 +57,17 @@ export function EntryLine({ entry }: { entry: LogEntry }) {
 
   if (entry.type === 'error') {
     return (
-      <div className="font-mono text-xs leading-relaxed flex gap-3 text-red-400">
-        <span className="text-zinc-600 shrink-0 select-none">{time}</span>
-        <span className="shrink-0 select-none text-red-500">x</span>
+      <div className="font-mono text-xs leading-relaxed flex gap-3 text-red-600 dark:text-red-400">
+        <span className="text-zinc-500 dark:text-zinc-600 shrink-0 select-none">{time}</span>
+        <span className="shrink-0 select-none text-red-600 dark:text-red-500">x</span>
         <span className="whitespace-pre-wrap break-all">{entry.content}</span>
       </div>
     )
   }
 
   return (
-    <div className="font-mono text-xs leading-relaxed flex gap-3 text-zinc-500">
-      <span className="text-zinc-600 shrink-0 select-none">{time}</span>
+    <div className="font-mono text-xs leading-relaxed flex gap-3 text-zinc-500 dark:text-zinc-500">
+      <span className="text-zinc-500 dark:text-zinc-600 shrink-0 select-none">{time}</span>
       <span className="shrink-0 w-3" />
       <span className="whitespace-pre-wrap break-all">{entry.content}</span>
     </div>

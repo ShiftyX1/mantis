@@ -29,12 +29,12 @@ function SessionCard({ log, expanded, onToggle }: { log: SessionLog; expanded: b
   const isRunning = log.status === 'running'
 
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
+    <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
       <div
-        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-zinc-100/50 dark:hover:bg-zinc-800/40"
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
         onClick={onToggle}
       >
-        <div className="text-zinc-600">
+        <div className="text-zinc-400 dark:text-zinc-600">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </div>
         <div className={`p-1.5 rounded-md ${isRunning ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
@@ -63,7 +63,7 @@ function SessionCard({ log, expanded, onToggle }: { log: SessionLog; expanded: b
       </div>
 
       {expanded && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-950 px-4 py-3.5 space-y-1 max-h-125 overflow-y-auto">
+        <div className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-4 py-3.5 space-y-1 max-h-125 overflow-y-auto">
           {log.prompt && <PromptBanner prompt={log.prompt} />}
           {log.entries.length === 0 && !log.prompt ? (
             <p className="text-zinc-500 dark:text-zinc-600 text-xs font-mono">No entries yet</p>
