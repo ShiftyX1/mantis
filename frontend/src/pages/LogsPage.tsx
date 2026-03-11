@@ -3,6 +3,10 @@ import { ScrollText, Terminal, ChevronRight, ChevronDown, Clock, CheckCircle2, L
 import { api } from '../api'
 import { EntryLine, PromptBanner } from '../components/LogEntries'
 import type { SessionLog, Connection } from '../types'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/EmptyState'
+import { ConfirmDelete } from '@/components/ConfirmDelete'
 
 const PAGE_SIZE = 10
 
@@ -25,12 +29,12 @@ function SessionCard({ log, expanded, onToggle }: { log: SessionLog; expanded: b
   const isRunning = log.status === 'running'
 
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
+    <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
       <div
-        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-zinc-800/40"
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
         onClick={onToggle}
       >
-        <div className="text-zinc-600">
+        <div className="text-zinc-400 dark:text-zinc-600">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </div>
         <div className={`p-1.5 rounded-md ${isRunning ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
@@ -41,30 +45,28 @@ function SessionCard({ log, expanded, onToggle }: { log: SessionLog; expanded: b
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-zinc-200 text-sm">{log.agentName}</span>
-            <span className={`px-1.5 py-0.5 text-[11px] font-medium rounded-full ${
-              isRunning ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'
-            }`}>
+            <span className="font-medium text-zinc-800 dark:text-zinc-200 text-sm">{log.agentName}</span>
+            <Badge variant={isRunning ? 'warning' : 'success'}>
               {log.status}
-            </span>
+            </Badge>
           </div>
           {log.prompt && (
             <p className="text-xs text-zinc-500 mt-0.5 truncate">{log.prompt}</p>
           )}
-          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-zinc-600">
+          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-600">
             <span className="flex items-center gap-1"><Clock size={10} />{timeAgo(log.startedAt)}</span>
             <span>{duration(log.startedAt, log.finishedAt)}</span>
             <span>{log.entries.length} entries</span>
           </div>
         </div>
-        <span className="font-mono text-[11px] text-zinc-700">{log.id.slice(0, 8)}</span>
+        <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-700">{log.id.slice(0, 8)}</span>
       </div>
 
       {expanded && (
-        <div className="border-t border-zinc-800 bg-zinc-950 px-4 py-3.5 space-y-1 max-h-[500px] overflow-y-auto">
+        <div className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-4 py-3.5 space-y-1 max-h-125 overflow-y-auto">
           {log.prompt && <PromptBanner prompt={log.prompt} />}
           {log.entries.length === 0 && !log.prompt ? (
-            <p className="text-zinc-600 text-xs font-mono">No entries yet</p>
+            <p className="text-zinc-500 dark:text-zinc-600 text-xs font-mono">No entries yet</p>
           ) : (
             log.entries.map((entry, i) => <EntryLine key={i} entry={entry} />)
           )}
@@ -82,6 +84,7 @@ export default function LogsPage() {
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [clearOpen, setClearOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -148,27 +151,23 @@ export default function LogsPage() {
     <div className="p-6 max-w-5xl">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Session Logs</h1>
-          <p className="text-xs text-zinc-600 mt-0.5">Execution history per connection</p>
+          <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Session Logs</h1>
+          <p className="text-xs text-zinc-500 dark:text-zinc-600 mt-0.5">Execution history per connection</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={async () => {
-              if (!confirm('Clear all session logs? This cannot be undone.')) return
-              await api.sessionLogs.clear()
-              setLogs([])
-              setHasMore(false)
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-400/70 bg-zinc-800 rounded-lg hover:text-red-300 hover:bg-zinc-700"
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setClearOpen(true)}
           >
             <Trash2 size={13} />
             Clear all
-          </button>
+          </Button>
           <Filter size={14} className="text-zinc-600" />
           <select
             value={selectedConn}
             onChange={e => { setSelectedConn(e.target.value); setExpanded(null) }}
-            className="px-2.5 py-1.5 border border-zinc-800 rounded-lg text-xs bg-zinc-900 text-zinc-400 focus:outline-none focus:border-teal-500/50"
+            className="px-2.5 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 focus:outline-none focus:border-teal-500/50"
           >
             <option value="">All connections</option>
             {connections.map(c => (
@@ -179,19 +178,15 @@ export default function LogsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-zinc-600 text-sm">Loading...</div>
+        <div className="text-center py-12 text-zinc-500 dark:text-zinc-600 text-sm">Loading...</div>
       ) : logs.length === 0 ? (
-        <div className="text-center py-20">
-          <ScrollText size={40} className="mx-auto text-zinc-700 mb-3" />
-          <p className="text-zinc-400 text-sm font-medium">No session logs yet</p>
-          <p className="text-xs text-zinc-600 mt-1">Logs will appear here as agents execute tasks</p>
-        </div>
+        <EmptyState icon={ScrollText} title="No session logs yet" description="Logs will appear here as agents execute tasks" />
       ) : (
         <div className="space-y-2.5">
           {logs.map(log => (
             <div key={log.id}>
               {selectedConn === '' && (
-                <p className="text-[11px] text-zinc-600 mb-1 ml-1 flex items-center gap-1.5">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-600 mb-1 ml-1 flex items-center gap-1.5">
                   <Terminal size={10} />
                   {connName(log.connectionId)}
                 </p>
@@ -205,17 +200,26 @@ export default function LogsPage() {
           ))}
           {hasMore && (
             <div className="flex justify-center pt-2">
-              <button
-                onClick={loadMoreLogs}
-                disabled={loadingMore}
-                className="px-3 py-1.5 text-xs font-medium text-zinc-500 bg-zinc-800 rounded-lg hover:text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
+              <Button variant="secondary" size="sm" onClick={loadMoreLogs} disabled={loadingMore}>
                 {loadingMore ? 'Loading...' : `Load more ${PAGE_SIZE}`}
-              </button>
+              </Button>
             </div>
           )}
         </div>
       )}
+
+      <ConfirmDelete
+        open={clearOpen}
+        onCancel={() => setClearOpen(false)}
+        onConfirm={async () => {
+          await api.sessionLogs.clear()
+          setLogs([])
+          setHasMore(false)
+          setClearOpen(false)
+        }}
+        title="Clear all session logs?"
+        description="This cannot be undone."
+      />
     </div>
   )
 }
