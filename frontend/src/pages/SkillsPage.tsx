@@ -6,6 +6,7 @@ import type { Connection, Skill } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { CodeEditor } from '@/components/CodeEditor'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -231,10 +232,9 @@ export default function SkillsPage() {
             </FormField>
 
             <FormField label="Script" hint={scriptHint(form.parameters)}>
-              <Textarea
+              <CodeEditor
                 value={form.script}
-                onChange={e => setForm(f => ({ ...f, script: e.target.value }))}
-                className="h-56 font-mono text-xs"
+                onChange={script => setForm(f => ({ ...f, script }))}
                 placeholder={'sudo systemctl restart {{.service_name}}\nsudo systemctl status {{.service_name}} --no-pager'}
               />
             </FormField>

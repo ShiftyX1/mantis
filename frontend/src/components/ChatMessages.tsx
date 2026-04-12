@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Terminal, Calculator, Download, Mic, Eye, Wrench, X, CheckCircle2, AlertCircle, Loader2, ScrollText } from 'lucide-react'
+import { Terminal, Calculator, Download, Mic, Eye, Wrench, Wand2, Play, GitBranch, X, CheckCircle2, AlertCircle, Loader2, ScrollText } from 'lucide-react'
 import { Markdown } from './Markdown'
 import { EntryLine, PromptBanner } from './LogEntries'
 import { api } from '../api'
@@ -11,6 +11,9 @@ export const STEP_ICONS: Record<string, typeof Terminal> = {
   download: Download,
   mic: Mic,
   eye: Eye,
+  skill: Wand2,
+  play: Play,
+  'git-branch': GitBranch,
 }
 
 export function MessageBubble({ msg, onStepClick }: { msg: ChatMessage; onStepClick: (s: Step) => void }) {

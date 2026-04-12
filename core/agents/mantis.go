@@ -527,16 +527,16 @@ func (a *MantisAgent) skillTool(c types.Connection, s types.Skill) types.Tool {
 	return types.Tool{
 		Name:        toolName,
 		Description: toolDescription,
-		Icon:        "terminal",
+		Icon:        "skill",
 		Label: func(args string) string {
 			payload := strings.TrimSpace(args)
 			if payload == "" || payload == "{}" {
-				return s.Name
+				return "Skill: " + s.Name
 			}
 			if len(payload) > 40 {
 				payload = payload[:40] + "..."
 			}
-			return s.Name + ": " + payload
+			return "Skill: " + s.Name + " " + payload
 		},
 		Parameters: params,
 		Execute: func(_ context.Context, args string) (string, error) {
