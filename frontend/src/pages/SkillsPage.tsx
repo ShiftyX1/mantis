@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Pencil, Trash2, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../api'
@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { FormField } from '@/components/FormField'
 import { ConfirmDelete } from '@/components/ConfirmDelete'
 import { ParameterEditor } from '@/components/ParameterEditor'
+import { ParamButtons, insertAtCursor } from '@/components/ParamButtons'
 
 type SkillForm = {
   connectionId: string
@@ -36,8 +37,7 @@ function scriptHint(params: Record<string, unknown>): string {
   if (!props || Object.keys(props).length === 0) {
     return 'Bash script executed on the server via SSH'
   }
-  const vars = Object.keys(props).map(k => `{{.${k}}}`).join(', ')
-  return `Use Go template syntax to inject parameters: ${vars}`
+  return 'Use Go template syntax to inject parameters'
 }
 
 export default function SkillsPage() {
@@ -48,6 +48,7 @@ export default function SkillsPage() {
   const [editing, setEditing] = useState<Skill | null>(null)
   const [form, setForm] = useState<SkillForm>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const scriptRef = useRef<HTMLTextAreaElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -233,9 +234,14 @@ export default function SkillsPage() {
 
             <FormField label="Script" hint={scriptHint(form.parameters)}>
               <CodeEditor
+                ref={scriptRef}
                 value={form.script}
                 onChange={script => setForm(f => ({ ...f, script }))}
                 placeholder={'sudo systemctl restart {{.service_name}}\nsudo systemctl status {{.service_name}} --no-pager'}
+              />
+              <ParamButtons
+                parameters={form.parameters}
+                onInsert={snippet => insertAtCursor(scriptRef.current, snippet, form.script, v => setForm(f => ({ ...f, script: v })))}
               />
             </FormField>
 

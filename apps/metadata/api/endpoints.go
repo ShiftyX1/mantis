@@ -48,11 +48,6 @@ type UseCases struct {
 	ListPlanRuns       *usecases.ListPlanRuns
 	GetPlanRun         *usecases.GetPlanRun
 	PlanRunner         *plans.Runner
-	CreateCronJob      *usecases.CreateCronJob
-	GetCronJob         *usecases.GetCronJob
-	ListCronJobs       *usecases.ListCronJobs
-	UpdateCronJob      *usecases.UpdateCronJob
-	DeleteCronJob      *usecases.DeleteCronJob
 	CreateGuardProfile *usecases.CreateGuardProfile
 	ListGuardProfiles  *usecases.ListGuardProfiles
 	UpdateGuardProfile *usecases.UpdateGuardProfile
@@ -114,12 +109,6 @@ func (e *Endpoints) Register(api huma.API) {
 	huma.Register(api, huma.Operation{OperationID: "trigger-plan-run", Method: http.MethodPost, Path: "/api/plans/{planId}/runs", DefaultStatus: 201}, e.triggerPlanRun)
 	huma.Register(api, huma.Operation{OperationID: "get-plan-run", Method: http.MethodGet, Path: "/api/plan-runs/{id}"}, e.getPlanRun)
 	huma.Register(api, huma.Operation{OperationID: "cancel-plan-run", Method: http.MethodPost, Path: "/api/plan-runs/{id}/cancel"}, e.cancelPlanRun)
-
-	huma.Register(api, huma.Operation{OperationID: "create-cron-job", Method: http.MethodPost, Path: "/api/cron-jobs", DefaultStatus: 201}, e.createCronJob)
-	huma.Register(api, huma.Operation{OperationID: "list-cron-jobs", Method: http.MethodGet, Path: "/api/cron-jobs"}, e.listCronJobs)
-	huma.Register(api, huma.Operation{OperationID: "get-cron-job", Method: http.MethodGet, Path: "/api/cron-jobs/{id}"}, e.getCronJob)
-	huma.Register(api, huma.Operation{OperationID: "update-cron-job", Method: http.MethodPut, Path: "/api/cron-jobs/{id}"}, e.updateCronJob)
-	huma.Register(api, huma.Operation{OperationID: "delete-cron-job", Method: http.MethodDelete, Path: "/api/cron-jobs/{id}", DefaultStatus: 204}, e.deleteCronJob)
 
 	huma.Register(api, huma.Operation{OperationID: "create-guard-profile", Method: http.MethodPost, Path: "/api/guard-profiles", DefaultStatus: 201}, e.createGuardProfile)
 	huma.Register(api, huma.Operation{OperationID: "list-guard-profiles", Method: http.MethodGet, Path: "/api/guard-profiles"}, e.listGuardProfiles)
@@ -410,7 +399,7 @@ func (e *Endpoints) triggerPlanRun(ctx context.Context, input *TriggerPlanRunInp
 	if e.uc.PlanRunner == nil {
 		return nil, huma.NewError(http.StatusServiceUnavailable, "plan runner not available")
 	}
-	run, err := e.uc.PlanRunner.TriggerRun(ctx, input.PlanID, "manual")
+	run, err := e.uc.PlanRunner.TriggerRun(ctx, input.PlanID, "manual", input.Body.Input)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -434,47 +423,6 @@ func (e *Endpoints) cancelPlanRun(ctx context.Context, input *CancelPlanRunInput
 		return nil, mapErr(err)
 	}
 	return toPlanRunOutput(run), nil
-}
-
-func (e *Endpoints) createCronJob(ctx context.Context, input *CreateCronJobInput) (*CronJobOutput, error) {
-	name, schedule, prompt, enabled := cronJobFromCreateInput(input)
-	j, err := e.uc.CreateCronJob.Execute(ctx, name, schedule, prompt, enabled)
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	return toCronJobOutput(j), nil
-}
-
-func (e *Endpoints) listCronJobs(ctx context.Context, _ *struct{}) (*CronJobsOutput, error) {
-	items, err := e.uc.ListCronJobs.Execute(ctx)
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	return toCronJobsOutput(items), nil
-}
-
-func (e *Endpoints) getCronJob(ctx context.Context, input *CronJobIDInput) (*CronJobOutput, error) {
-	j, err := e.uc.GetCronJob.Execute(ctx, input.ID)
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	return toCronJobOutput(j), nil
-}
-
-func (e *Endpoints) updateCronJob(ctx context.Context, input *UpdateCronJobInput) (*CronJobOutput, error) {
-	id, name, schedule, prompt, enabled := cronJobFromUpdateInput(input)
-	j, err := e.uc.UpdateCronJob.Execute(ctx, id, name, schedule, prompt, enabled)
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	return toCronJobOutput(j), nil
-}
-
-func (e *Endpoints) deleteCronJob(ctx context.Context, input *CronJobIDInput) (*struct{}, error) {
-	if err := e.uc.DeleteCronJob.Execute(ctx, input.ID); err != nil {
-		return nil, mapErr(err)
-	}
-	return nil, nil
 }
 
 func (e *Endpoints) createGuardProfile(ctx context.Context, input *CreateGuardProfileInput) (*GuardProfileOutput, error) {

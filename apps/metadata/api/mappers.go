@@ -149,22 +149,6 @@ func toPlanRunsOutput(items []types.PlanRun) *PlanRunsOutput {
 	return &PlanRunsOutput{Body: items}
 }
 
-func toCronJobOutput(j types.CronJob) *CronJobOutput {
-	return &CronJobOutput{Body: j}
-}
-
-func toCronJobsOutput(items []types.CronJob) *CronJobsOutput {
-	return &CronJobsOutput{Body: items}
-}
-
-func cronJobFromCreateInput(input *CreateCronJobInput) (string, string, string, bool) {
-	return input.Body.Name, input.Body.Schedule, input.Body.Prompt, input.Body.Enabled
-}
-
-func cronJobFromUpdateInput(input *UpdateCronJobInput) (string, string, string, string, bool) {
-	return input.ID, input.Body.Name, input.Body.Schedule, input.Body.Prompt, input.Body.Enabled
-}
-
 func toGuardProfileOutput(p types.GuardProfile) *GuardProfileOutput {
 	return &GuardProfileOutput{Body: p}
 }

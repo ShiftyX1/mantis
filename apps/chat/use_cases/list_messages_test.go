@@ -59,7 +59,7 @@ func TestListMessages_StalePendingAndBufferOverlay(t *testing.T) {
 	if store.lastQuery.Page.Limit != 10 || store.lastQuery.Page.Offset != 0 {
 		t.Fatalf("unexpected pagination: %+v", store.lastQuery.Page)
 	}
-	if store.lastQuery.FilterNot["source"] != "cron" {
+	if store.lastQuery.FilterNot["source"] != "plan" {
 		t.Fatalf("unexpected filter_not: %+v", store.lastQuery.FilterNot)
 	}
 	if len(store.lastQuery.Sort) != 1 || store.lastQuery.Sort[0].Field != "created_at" || store.lastQuery.Sort[0].Dir != types.SortDirDesc {

@@ -13,10 +13,12 @@ Multi-agent system where an LLM orchestrates a pool of isolated agents, each run
 - **Any LLM** — works with any OpenAI-compatible API: cloud or local (Ollama, LM Studio, etc.)
 - **Sandboxes** — each server is a Docker container with SSH and pre-installed tools
 - **Skills** — reusable SSH scripts exposed as LLM tools with typed parameters and Go template injection
-- **Plans** — agentic workflows: visual graph editor (React Flow) with action/decision nodes, branching, retries, clear context, cancel, scheduled execution
-- **Cron** — scheduled single-prompt jobs with Telegram delivery ("send me BTC price every morning")
+- **Plans** — agentic workflows: visual graph editor (React Flow) with action/decision nodes, branching, retries, clear context, cancel, scheduled execution via cron
+  - **Parameters** — plans support typed input parameters (JSON Schema); node prompts use Go templates (`{{.param}}`) for dynamic values
+  - **Agent-created plans** — the LLM agent can create multi-step plans from chat using a simple DSL (steps with actions and decisions), including scheduled tasks
 - **Presets** — named model configurations (chat model, fallback model, image model) assignable per connection or globally
 - **Memory** — long-term memory: remembers facts about you and each server across conversations
+- **Notifications** — the agent can send proactive alerts and reports to Telegram via `send_notification`
 - **Telegram** — bot with voice messages, files, model switching
 - **ASR / OCR / TTS** — optional speech-to-text, OCR, text-to-speech integrations
 
@@ -38,7 +40,7 @@ Multi-agent system where an LLM orchestrates a pool of isolated agents, each run
 │  └─────────────┘   └────────┬─────────┘                         │
 │                          tool calls                             │
 │  ┌────────────┐         ┌───┴────┐                              │
-│  │ PostgreSQL │         │ Guard  │──── deny ───▶ ✕ blocked      │
+│  │ PostgreSQL │         │ Guard  │──── deny ───▶ x blocked      │
 │  └────────────┘         └───┬────┘                              │
 │                           allow                                 │
 │                    ┌────────┼────────┐                           │
@@ -61,9 +63,8 @@ Multi-agent system where an LLM orchestrates a pool of isolated agents, each run
 | Page | Description |
 |------|-------------|
 | Chat | Conversations with the agent, session management |
-| Plans | Visual workflow editor (React Flow), run history with step-by-step logs |
+| Plans | Visual workflow editor (React Flow), run history, parameters, scheduled execution |
 | Skills | Reusable SSH scripts with parameter editor, exposed as agent tools |
-| Cron Jobs | Scheduled tasks with Telegram delivery |
 | Servers | SSH connection management |
 | LLMs & Models | LLM provider connections and model registry |
 | Presets | Named model configurations (chat / fallback / image) |
@@ -109,7 +110,6 @@ See `.env.example` for defaults. Key variables:
 |----------|-------------|
 | `DATABASE_URL` | Postgres connection string |
 | `PORT` | Backend port (default `8080`) |
-| `CRON_DELIVERY_CHANNEL` | Where cron results go (`telegram` or empty) |
 | `ASR_API_URL` | Speech-to-text service URL (optional) |
 | `OCR_API_URL` | OCR service URL (optional) |
 | `TTS_API_URL` | Text-to-speech service URL (optional) |

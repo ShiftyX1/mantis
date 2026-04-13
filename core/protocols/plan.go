@@ -7,5 +7,5 @@ import (
 )
 
 type PlanRunner interface {
-	TriggerRun(ctx context.Context, planID, trigger string) (types.PlanRun, error)
+	TriggerRun(ctx context.Context, planID, trigger string, input map[string]any) (types.PlanRun, error)
 }

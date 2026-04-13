@@ -105,14 +105,14 @@ func (uc *HandleModelCommand) presetListReply(ctx context.Context, currentID str
 	row := []btn{}
 
 	row = append(row, btn{
-		"text":          func() string { if currentID == "" { return "✅ Inherit" }; return "Inherit" }(),
+		"text":          func() string { if currentID == "" { return "[x] Inherit" }; return "Inherit" }(),
 		"callback_data": "model:inherit",
 	})
 
 	for _, p := range items {
 		label := p.Name
 		if p.ID == currentID {
-			label = "✅ " + label
+			label = "[x] " + label
 		}
 		row = append(row, btn{
 			"text":          label,

@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,7 +50,7 @@ func NewRunner(
 	}
 }
 
-func (r *Runner) TriggerRun(ctx context.Context, planID, trigger string) (types.PlanRun, error) {
+func (r *Runner) TriggerRun(ctx context.Context, planID, trigger string, input map[string]any) (types.PlanRun, error) {
 	plans, err := r.planStore.Get(ctx, []string{planID})
 	if err != nil {
 		return types.PlanRun{}, err
@@ -63,12 +64,17 @@ func (r *Runner) TriggerRun(ctx context.Context, planID, trigger string) (types.
 		return types.PlanRun{}, fmt.Errorf("invalid graph: %w", err)
 	}
 
+	if input == nil {
+		input = map[string]any{}
+	}
+
 	now := time.Now().UTC()
 	run := types.PlanRun{
 		ID:        uuid.New().String(),
 		PlanID:    planID,
 		Status:    "running",
 		Trigger:   trigger,
+		Input:     input,
 		Steps:     initSteps(plan.Graph),
 		StartedAt: now,
 	}
@@ -204,9 +210,9 @@ func (r *Runner) execute(ctx context.Context, plan types.Plan, run types.PlanRun
 
 		r.markStepRunning(&run, current)
 
-		prompt := node.Prompt
+		prompt := renderPrompt(node.Prompt, run.Input)
 		if node.Type == types.PlanNodeDecision {
-			prompt = decisionPrompt(node)
+			prompt = decisionPrompt(node, run.Input)
 		}
 
 		res, err := r.executeWithRetry(ctx, sessionID, node, prompt)
@@ -319,16 +325,32 @@ func (r *Runner) executeNode(ctx context.Context, sessionID, prompt string, clea
 	return nodeResult{content: msg.Content, messageID: msg.ID}, nil
 }
 
-func decisionPrompt(node types.PlanNode) string {
+func renderPrompt(raw string, input map[string]any) string {
+	if len(input) == 0 || !strings.Contains(raw, "{{") {
+		return raw
+	}
+	tmpl, err := template.New("prompt").Option("missingkey=zero").Parse(raw)
+	if err != nil {
+		return raw
+	}
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, input); err != nil {
+		return raw
+	}
+	return buf.String()
+}
+
+func decisionPrompt(node types.PlanNode, input map[string]any) string {
+	rendered := renderPrompt(node.Prompt, input)
 	if node.ClearContext {
 		return fmt.Sprintf(
 			"Answer this question. Reply with EXACTLY 'yes' or 'no' as the FIRST word of your response, then explain briefly.\n\nQuestion: %s",
-			node.Prompt,
+			rendered,
 		)
 	}
 	return fmt.Sprintf(
 		"Based on everything above, answer this question. Reply with EXACTLY 'yes' or 'no' as the FIRST word of your response, then explain briefly.\n\nQuestion: %s",
-		node.Prompt,
+		rendered,
 	)
 }
 

@@ -76,7 +76,7 @@ func (uc *ListMessages) list(ctx context.Context, limit, offset int, sessionID, 
 	if source != "" {
 		query.Filter = map[string]string{"source": source}
 	} else {
-		query.FilterNot = map[string]string{"source": "cron"}
+		query.FilterNot = map[string]string{"source": "plan"}
 	}
 	if sessionID != "" {
 		if query.Filter == nil {

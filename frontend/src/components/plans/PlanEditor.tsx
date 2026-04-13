@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import {
   ReactFlow,
   Background,
@@ -25,6 +25,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { FormField } from '@/components/FormField'
+import { ParameterEditor } from '@/components/ParameterEditor'
+import { ParamButtons, insertAtCursor } from '@/components/ParamButtons'
 
 let nodeIdCounter = 0
 
@@ -42,6 +44,7 @@ export default function PlanEditor({ plan: initialPlan, onBack, onSaved }: Props
     description: initialPlan.description,
     schedule: initialPlan.schedule,
     enabled: initialPlan.enabled,
+    parameters: initialPlan.parameters ?? { type: 'object', properties: {} },
   })
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodes(initialPlan.graph.nodes))
@@ -182,7 +185,7 @@ export default function PlanEditor({ plan: initialPlan, onBack, onSaved }: Props
 
   const savePlan = async () => {
     const graph: PlanGraph = { nodes: fromFlowNodes(nodes), edges: fromFlowEdges(edges) }
-    const payload = { name: plan.name, description: plan.description, schedule: plan.schedule, enabled: plan.enabled, graph }
+    const payload = { name: plan.name, description: plan.description, schedule: plan.schedule, enabled: plan.enabled, parameters: plan.parameters ?? {}, graph }
     try {
       if (plan.id) {
         await api.plans.update(plan.id, payload)
@@ -266,6 +269,7 @@ export default function PlanEditor({ plan: initialPlan, onBack, onSaved }: Props
             onFormChange={setNodeForm}
             onApply={updateSelectedNode}
             onDelete={deleteSelectedNode}
+            planParameters={plan.parameters as Record<string, unknown> ?? {}}
           />
         )}
 
@@ -284,6 +288,7 @@ export default function PlanEditor({ plan: initialPlan, onBack, onSaved }: Props
           <PlanRuns
             planId={plan.id}
             planNodes={currentPlanNodes}
+            planParameters={plan.parameters ?? {}}
             onActiveSteps={setActiveRunSteps}
           />
         </div>
@@ -309,6 +314,12 @@ export default function PlanEditor({ plan: initialPlan, onBack, onSaved }: Props
               <Switch checked={metaForm.enabled} onCheckedChange={v => setMetaForm(f => ({ ...f, enabled: v }))} />
               <span className="text-xs text-zinc-600 dark:text-zinc-400">{metaForm.enabled ? 'Enabled' : 'Disabled'}</span>
             </div>
+            <FormField label="Parameters" hint="Define input parameters for this plan. Use {{.param_name}} in node prompts.">
+              <ParameterEditor
+                value={metaForm.parameters as Record<string, unknown>}
+                onChange={v => setMetaForm(f => ({ ...f, parameters: v }))}
+              />
+            </FormField>
             <DialogFooter>
               <Button variant="secondary" onClick={closeMeta}>Cancel</Button>
               <Button onClick={submitMeta} disabled={!metaForm.name.trim()}>
@@ -322,13 +333,16 @@ export default function PlanEditor({ plan: initialPlan, onBack, onSaved }: Props
   )
 }
 
-function NodePropertiesPanel({ node, form, onFormChange, onApply, onDelete }: {
+function NodePropertiesPanel({ node, form, onFormChange, onApply, onDelete, planParameters }: {
   node: Node
   form: { label: string; prompt: string; clearContext: boolean; maxRetries: number }
   onFormChange: (f: { label: string; prompt: string; clearContext: boolean; maxRetries: number }) => void
   onApply: () => void
   onDelete: () => void
+  planParameters: Record<string, unknown>
 }) {
+  const promptRef = useRef<HTMLTextAreaElement>(null)
+
   return (
     <div className="w-72 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 overflow-auto shrink-0">
       <div className="flex items-center justify-between mb-4">
@@ -352,12 +366,17 @@ function NodePropertiesPanel({ node, form, onFormChange, onApply, onDelete }: {
         </FormField>
         <FormField label={node.type === 'decision' ? 'Question / Condition' : 'Prompt'}>
           <Textarea
+            ref={promptRef}
             value={form.prompt}
             onChange={e => onFormChange({ ...form, prompt: e.target.value })}
             className="h-32 text-xs"
             placeholder={node.type === 'decision' ? 'Was the deployment successful?' : 'Deploy the latest version to production...'}
           />
         </FormField>
+        <ParamButtons
+          parameters={planParameters}
+          onInsert={snippet => insertAtCursor(promptRef.current, snippet, form.prompt, v => onFormChange({ ...form, prompt: v }))}
+        />
         {node.type === 'decision' && (
           <p className="text-[11px] text-zinc-500 dark:text-zinc-600">
             Connect the green handle (left) for &quot;yes&quot; and red handle (right) for &quot;no&quot;

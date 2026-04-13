@@ -37,14 +37,6 @@ export interface Memory {
   createdAt: string
 }
 
-export interface CronJob {
-  id: string
-  name: string
-  schedule: string
-  prompt: string
-  enabled: boolean
-}
-
 export interface Connection {
   id: string
   type: string
@@ -100,6 +92,7 @@ export interface Plan {
   description: string
   schedule: string
   enabled: boolean
+  parameters: Record<string, unknown>
   graph: PlanGraph
 }
 
@@ -120,6 +113,7 @@ export interface PlanRun {
   planId: string
   status: PlanRunStatus
   trigger: 'manual' | 'schedule'
+  input: Record<string, unknown>
   steps: PlanStepRun[]
   startedAt: string
   finishedAt?: string

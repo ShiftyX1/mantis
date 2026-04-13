@@ -131,7 +131,7 @@ func (a *App) syncPlans(ctx context.Context) {
 
 func (a *App) executePlan(ctx context.Context, plan types.Plan) {
 	log.Printf("plans: triggering scheduled run for plan=%s (%s)", plan.ID, plan.Name)
-	_, err := a.runner.TriggerRun(ctx, plan.ID, "schedule")
+	_, err := a.runner.TriggerRun(ctx, plan.ID, "schedule", nil)
 	if err != nil {
 		log.Printf("plans: trigger run for plan=%s: %v", plan.ID, err)
 	}

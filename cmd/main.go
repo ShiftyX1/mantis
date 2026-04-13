@@ -17,7 +17,6 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 
 	"mantis/apps/chat"
-	"mantis/apps/cron"
 	"mantis/apps/logs"
 	"mantis/apps/metadata"
 	plansapp "mantis/apps/plans"
@@ -42,7 +41,6 @@ import (
 func main() {
 	dsn := env("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/mantis?sslmode=disable")
 	port := env("PORT", "8080")
-	cronDeliveryChannel := env("CRON_DELIVERY_CHANNEL", "")
 
 	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 	db := bun.NewDB(sqldb, pgdialect.New())
@@ -96,13 +94,6 @@ func main() {
 		mappers.PlanRunToRow,
 		mappers.PlanRunFromRow,
 	)
-	cronJobStore := store.NewPostgres[string, types.CronJob, models.CronJobRow](
-		db,
-		func(j types.CronJob) string { return j.ID },
-		mappers.CronJobToRow,
-		mappers.CronJobFromRow,
-	)
-
 	sessionStore := store.NewPostgres[string, types.ChatSession, models.ChatSessionRow](
 		db,
 		func(s types.ChatSession) string { return s.ID },
@@ -153,7 +144,7 @@ func main() {
 	}
 
 	visionAdapter := llm.NewVision()
-	mantisAgent := agents.NewMantisAgent(messageStore, modelStore, presetStore, llmConnStore, connectionStore, skillStore, planStore, cronJobStore, settingsStore, openaiAdapter, commandGuard, sessionLogger, asrAdapter, ocrAdapter, visionAdapter)
+	mantisAgent := agents.NewMantisAgent(messageStore, modelStore, presetStore, llmConnStore, connectionStore, skillStore, planStore, channelStore, settingsStore, openaiAdapter, commandGuard, sessionLogger, asrAdapter, ocrAdapter, visionAdapter)
 
 	buf := shared.NewBuffer()
 	artifactMgr := artifactplugin.NewManager(artifactadapter.NewInMemorySessionStorage())
@@ -162,16 +153,12 @@ func main() {
 	plansApp := plansapp.NewApp(settingsStore, sessionStore, messageStore, modelStore, presetStore, planStore, planRunStore, mantisAgent, artifactMgr, memoryExtractor)
 	mantisAgent.SetPlanRunner(plansApp.Runner())
 
-	metadataApp := metadata.NewApp(settingsStore, llmConnStore, modelStore, presetStore, connectionStore, skillStore, planStore, planRunStore, plansApp.Runner(), cronJobStore, guardProfileStore, channelStore)
+	metadataApp := metadata.NewApp(settingsStore, llmConnStore, modelStore, presetStore, connectionStore, skillStore, planStore, planRunStore, plansApp.Runner(), guardProfileStore, channelStore)
 	chatApp := chat.NewApp(sessionStore, messageStore, modelStore, presetStore, channelStore, settingsStore, mantisAgent, buf, artifactMgr, memoryExtractor)
 	logsApp := logs.NewApp(logStore)
 	telegramApp := telegram.NewApp(channelStore, sessionStore, messageStore, modelStore, presetStore, settingsStore, mantisAgent, buf, artifactMgr, asrAdapter, ttsAdapter, memoryExtractor)
-	cronApp := cron.NewApp(settingsStore, channelStore, sessionStore, messageStore, modelStore, presetStore, cronJobStore, mantisAgent, artifactMgr, memoryExtractor, cron.DeliveryConfig{
-		Channel: cronDeliveryChannel,
-	})
 
 	go telegramApp.Start(context.Background())
-	go cronApp.Start(context.Background())
 	go plansApp.Start(context.Background())
 
 	r := chi.NewMux()

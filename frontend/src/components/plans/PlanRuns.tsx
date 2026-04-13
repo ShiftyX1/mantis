@@ -7,7 +7,10 @@ import { StepBadge, StepPanel } from '../ChatMessages'
 import { Markdown } from '../Markdown'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/EmptyState'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { FormField } from '@/components/FormField'
 
 const runStatusCfg: Record<PlanRunStatus, { icon: typeof CheckCircle2; color: string; variant: 'success' | 'warning' | 'destructive' | 'muted' }> = {
   running:   { icon: Loader2,     color: 'text-blue-400 animate-spin', variant: 'warning' },
@@ -41,18 +44,38 @@ function duration(start?: string, end?: string) {
   return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`
 }
 
+interface ParamDef {
+  name: string
+  type: string
+  description: string
+}
+
+function extractParams(schema: Record<string, unknown>): ParamDef[] {
+  const props = (schema?.properties ?? {}) as Record<string, { type?: string; description?: string }>
+  return Object.entries(props).map(([name, p]) => ({
+    name,
+    type: p.type ?? 'string',
+    description: p.description ?? '',
+  }))
+}
+
 interface Props {
   planId: string
   planNodes: PlanNode[]
+  planParameters: Record<string, unknown>
   onActiveSteps: (steps: PlanStepRun[] | null) => void
 }
 
-export default function PlanRuns({ planId, planNodes, onActiveSteps }: Props) {
+export default function PlanRuns({ planId, planNodes, planParameters, onActiveSteps }: Props) {
   const [runs, setRuns] = useState<PlanRun[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [runMessages, setRunMessages] = useState<Record<string, ChatMessage[]>>({})
   const [openStep, setOpenStep] = useState<Step | null>(null)
+  const [inputOpen, setInputOpen] = useState(false)
+  const [inputValues, setInputValues] = useState<Record<string, string>>({})
+
+  const paramDefs = useMemo(() => extractParams(planParameters), [planParameters])
 
   const nodeMap = useMemo(() => new Map(planNodes.map(n => [n.id, n])), [planNodes])
 
@@ -74,8 +97,9 @@ export default function PlanRuns({ planId, planNodes, onActiveSteps }: Props) {
   useEffect(() => { loadRuns() }, [loadRuns])
 
   useEffect(() => {
-    if (!runs.some(r => r.status === 'running')) return
-    const iv = setInterval(loadRuns, 3000)
+    const hasRunning = runs.some(r => r.status === 'running')
+    const interval = hasRunning ? 2000 : 10000
+    const iv = setInterval(loadRuns, interval)
     return () => clearInterval(iv)
   }, [runs, loadRuns])
 
@@ -119,9 +143,20 @@ export default function PlanRuns({ planId, planNodes, onActiveSteps }: Props) {
     }
   }
 
-  const triggerRun = async () => {
+  const handleRunClick = () => {
+    if (paramDefs.length > 0) {
+      const defaults: Record<string, string> = {}
+      for (const p of paramDefs) defaults[p.name] = ''
+      setInputValues(defaults)
+      setInputOpen(true)
+    } else {
+      doTriggerRun({})
+    }
+  }
+
+  const doTriggerRun = async (input: Record<string, unknown>) => {
     try {
-      const newRun = await api.planRuns.trigger(planId)
+      const newRun = await api.planRuns.trigger(planId, input)
       toast.success('Plan execution started')
       setExpandedId(newRun.id)
       onActiveSteps(newRun.steps)
@@ -129,6 +164,22 @@ export default function PlanRuns({ planId, planNodes, onActiveSteps }: Props) {
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to trigger run')
     }
+  }
+
+  const submitInput = () => {
+    const input: Record<string, unknown> = {}
+    for (const p of paramDefs) {
+      const raw = inputValues[p.name] ?? ''
+      if (p.type === 'number' || p.type === 'integer') {
+        input[p.name] = Number(raw) || 0
+      } else if (p.type === 'boolean') {
+        input[p.name] = raw === 'true'
+      } else {
+        input[p.name] = raw
+      }
+    }
+    setInputOpen(false)
+    doTriggerRun(input)
   }
 
   if (loading) {
@@ -141,7 +192,7 @@ export default function PlanRuns({ planId, planNodes, onActiveSteps }: Props) {
         <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
           Runs{runs.length > 0 && ` (${runs.length})`}
         </span>
-        <Button size="sm" onClick={triggerRun}>
+        <Button size="sm" onClick={handleRunClick}>
           <Play size={12} /> Run Now
         </Button>
       </div>
@@ -175,6 +226,11 @@ export default function PlanRuns({ planId, planNodes, onActiveSteps }: Props) {
                       <span className="font-mono text-xs text-zinc-500">{run.id.slice(0, 8)}</span>
                       <Badge variant={cfg.variant}>{run.status}</Badge>
                       <Badge variant="muted">{run.trigger}</Badge>
+                      {run.input && Object.keys(run.input).length > 0 && (
+                        <span className="text-[10px] text-zinc-400 font-mono truncate max-w-[200px]" title={JSON.stringify(run.input)}>
+                          {Object.entries(run.input).map(([k, v]) => `${k}=${v}`).join(', ')}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-[11px] text-zinc-500 dark:text-zinc-600 shrink-0 ml-3">
                       <span className="flex items-center gap-1"><Clock size={10} />{timeAgo(run.startedAt)}</span>
@@ -229,6 +285,33 @@ export default function PlanRuns({ planId, planNodes, onActiveSteps }: Props) {
       )}
 
       {openStep && <StepPanel step={openStep} onClose={() => setOpenStep(null)} />}
+
+      <Dialog open={inputOpen} onOpenChange={setInputOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Run with parameters</DialogTitle>
+            <DialogDescription>Fill in the required inputs for this plan.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {paramDefs.map(p => (
+              <FormField key={p.name} label={p.name} hint={p.description}>
+                <Input
+                  value={inputValues[p.name] ?? ''}
+                  onChange={e => setInputValues(v => ({ ...v, [p.name]: e.target.value }))}
+                  placeholder={p.type}
+                  className="font-mono text-xs"
+                />
+              </FormField>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setInputOpen(false)}>Cancel</Button>
+            <Button onClick={submitInput}>
+              <Play size={12} /> Run
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

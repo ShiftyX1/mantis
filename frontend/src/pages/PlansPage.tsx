@@ -15,6 +15,7 @@ const emptyPlan: Plan = {
   description: '',
   schedule: '',
   enabled: false,
+  parameters: {},
   graph: { nodes: [], edges: [] },
 }
 
@@ -45,6 +46,7 @@ export default function PlansPage() {
         description: plan.description,
         schedule: plan.schedule,
         enabled: !plan.enabled,
+        parameters: plan.parameters ?? {},
         graph: plan.graph,
       })
       toast.success(plan.enabled ? 'Plan disabled' : 'Plan enabled')

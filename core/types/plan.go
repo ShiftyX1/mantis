@@ -32,10 +32,11 @@ type PlanGraph struct {
 }
 
 type Plan struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Schedule    string    `json:"schedule"`
-	Enabled     bool      `json:"enabled"`
-	Graph       PlanGraph `json:"graph"`
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Schedule    string          `json:"schedule"`
+	Enabled     bool            `json:"enabled"`
+	Parameters  json.RawMessage `json:"parameters"`
+	Graph       PlanGraph       `json:"graph"`
 }

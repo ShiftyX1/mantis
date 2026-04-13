@@ -258,36 +258,8 @@ type ListPlanRunsInput struct {
 
 type TriggerPlanRunInput struct {
 	PlanID string `path:"planId"`
-}
-
-type CronJobOutput struct {
-	Body types.CronJob
-}
-
-type CronJobsOutput struct {
-	Body []types.CronJob
-}
-
-type CronJobIDInput struct {
-	ID string `path:"id"`
-}
-
-type CreateCronJobInput struct {
-	Body struct {
-		Name     string `json:"name" required:"true" minLength:"1"`
-		Schedule string `json:"schedule" required:"true" minLength:"1"`
-		Prompt   string `json:"prompt" required:"true"`
-		Enabled  bool   `json:"enabled"`
-	}
-}
-
-type UpdateCronJobInput struct {
-	ID   string `path:"id"`
-	Body struct {
-		Name     string `json:"name" required:"true" minLength:"1"`
-		Schedule string `json:"schedule" required:"true" minLength:"1"`
-		Prompt   string `json:"prompt" required:"true"`
-		Enabled  bool   `json:"enabled"`
+	Body   struct {
+		Input map[string]any `json:"input,omitempty"`
 	}
 }
 

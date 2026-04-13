@@ -13,5 +13,6 @@ type PlanRow struct {
 	Description   string          `bun:"description"`
 	Schedule      string          `bun:"schedule"`
 	Enabled       bool            `bun:"enabled"`
+	Parameters    json.RawMessage `bun:"parameters,type:jsonb"`
 	Graph         json.RawMessage `bun:"graph,type:jsonb"`
 }
