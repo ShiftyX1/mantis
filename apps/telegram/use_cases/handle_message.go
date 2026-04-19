@@ -163,7 +163,7 @@ func (uc *HandleMessage) transcribeAudio(ctx context.Context, sender *adapter.Te
 		if result == "" {
 			continue
 		}
-		sender.SendQuote(ctx, "🎤 "+result)
+		sender.SendQuote(ctx, "[asr] "+result)
 		if text == "" || text == "User attached file(s)." {
 			text = result
 		} else {

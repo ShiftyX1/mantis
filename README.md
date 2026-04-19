@@ -1,6 +1,6 @@
 # Mantis
 
-Multi-agent system where an LLM orchestrates a pool of isolated agents, each running on a dedicated SSH sandbox container with specialized tools. Designed for managing large server infrastructure - from quick one-off tasks to ongoing operations like monitoring, deployments, and scheduled jobs. You interact via Telegram or Web UI - the LLM routes tasks to the right agent, commands pass through a guard layer before execution.
+Multi-agent system where an LLM orchestrates a pool of isolated agents, each running on a dedicated SSH sandbox container with specialized tools. Designed for managing large server infrastructure — from quick one-off tasks to complex multi-step workflows. You interact via Telegram or Web UI — the LLM routes tasks to the right agent, commands pass through a guard layer before execution.
 
 > Early development — works end-to-end but expect rough edges.
 
@@ -8,15 +8,19 @@ Multi-agent system where an LLM orchestrates a pool of isolated agents, each run
 
 ## What it does
 
-- You write a message, the LLM picks which server to use and what commands to run
-- Every command goes through a guard (security profiles with capabilities + command whitelists) before execution
-- Works with any OpenAI-compatible API — cloud or local (Ollama, LM Studio, etc.)
-- Each server is a Docker container with SSH and pre-installed tools
-- Long-term memory — remembers facts about you and each server across conversations
-- Web panel for managing everything: connections, models, guard profiles, cron jobs
-- Telegram bot with voice messages, files, model switching
-- Cron jobs — tell it "send me BTC price every morning" and it will
-- Optional speech-to-text, OCR, text-to-speech
+- **Chat** — write a message, the LLM picks which server to use and what commands to run
+- **Guard** — every command goes through a security layer (profiles with capabilities + command whitelists) before execution
+- **Any LLM** — works with any OpenAI-compatible API: cloud or local (Ollama, LM Studio, etc.)
+- **Sandboxes** — each server is a Docker container with SSH and pre-installed tools
+- **Skills** — reusable SSH scripts exposed as LLM tools with typed parameters and Go template injection
+- **Plans** — agentic workflows: visual graph editor (React Flow) with action/decision nodes, branching, retries, clear context, cancel, scheduled execution via cron
+  - **Parameters** — plans support typed input parameters (JSON Schema); node prompts use Go templates (`{{.param}}`) for dynamic values
+  - **Agent-created plans** — the LLM agent can create multi-step plans from chat using a simple DSL (steps with actions and decisions), including scheduled tasks
+- **Presets** — named model configurations (chat model, fallback model, image model) assignable per connection or globally
+- **Memory** — long-term memory: remembers facts about you and each server across conversations
+- **Notifications** — the agent can send proactive alerts and reports to Telegram via `send_notification`
+- **Telegram** — bot with voice messages, files, model switching
+- **ASR / OCR / TTS** — optional speech-to-text, OCR, text-to-speech integrations
 
 ## Architecture
 
@@ -36,7 +40,7 @@ Multi-agent system where an LLM orchestrates a pool of isolated agents, each run
 │  └─────────────┘   └────────┬─────────┘                         │
 │                          tool calls                             │
 │  ┌────────────┐         ┌───┴────┐                              │
-│  │ PostgreSQL │         │ Guard  │──── deny ───▶ ✕ blocked      │
+│  │ PostgreSQL │         │ Guard  │──── deny ───▶ x blocked      │
 │  └────────────┘         └───┬────┘                              │
 │                           allow                                 │
 │                    ┌────────┼────────┐                           │
@@ -54,15 +58,29 @@ Multi-agent system where an LLM orchestrates a pool of isolated agents, each run
                     isolated SSH sandboxes with pre-installed tools
 ```
 
+## Web Panel
+
+| Page | Description |
+|------|-------------|
+| Chat | Conversations with the agent, session management |
+| Plans | Visual workflow editor (React Flow), run history, parameters, scheduled execution |
+| Skills | Reusable SSH scripts with parameter editor, exposed as agent tools |
+| Servers | SSH connection management |
+| LLMs & Models | LLM provider connections and model registry |
+| Presets | Named model configurations (chat / fallback / image) |
+| Channels | Telegram bot configuration |
+| Guard Profiles | Security profiles with capability and command whitelists |
+| Logs | Session logs with tool call details |
+
 ## Quick start
 
 ```bash
 docker compose up --build
 ```
 
-Starts postgres, runs migrations, API on `:8080`, frontend on `:5173`, and 5 SSH sandboxes.
+Starts Postgres, runs migrations, API on `:27480`, frontend on `:27173`, and 5 SSH sandboxes (internal network only, not exposed to host ports).
 
-Go to http://localhost:5173 — first time it'll ask for your LLM provider URL and API key. Sets up the model, sandbox connections, and optionally a Telegram bot. After that just start chatting.
+Go to http://localhost:27173 — first time it'll ask for your LLM provider URL and API key. Sets up the model, sandbox connections, and optionally a Telegram bot. After that just start chatting.
 
 ## Dev setup
 
@@ -83,6 +101,28 @@ cd frontend && pnpm install && pnpm dev
 ```
 
 Backend on http://localhost:8080, frontend on http://localhost:5173 (proxies `/api` to backend).
+
+## Environment variables
+
+See `.env.example` for defaults. Key variables:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Postgres connection string |
+| `PORT` | Backend port (default `8080`) |
+| `ASR_API_URL` | Speech-to-text service URL (optional) |
+| `OCR_API_URL` | OCR service URL (optional) |
+| `TTS_API_URL` | Text-to-speech service URL (optional) |
+
+First-run wizard variables (used by `docker-compose.yml` for auto-setup):
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_LLM_BASE_URL` | LLM provider base URL |
+| `VITE_LLM_API_KEY` | LLM provider API key |
+| `VITE_LLM_MODEL` | Default model name |
+| `VITE_TG_BOT_TOKEN` | Telegram bot token (optional) |
+| `VITE_TG_USER_IDS` | Allowed Telegram user IDs (optional) |
 
 ## ASR, OCR & TTS (optional)
 

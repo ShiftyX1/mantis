@@ -1,4 +1,4 @@
-import type { Config, Model, Connection, CronJob, GuardProfile, ChatSession, ChatMessage, SessionLog, LlmConnection, Channel } from './types'
+import type { Settings, Model, Preset, Connection, Skill, Plan, PlanRun, GuardProfile, ChatSession, ChatMessage, SessionLog, LlmConnection, Channel } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -14,10 +14,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  config: {
-    get: () => request<Config>('/config'),
-    update: (data: unknown) =>
-      request<Config>('/config', { method: 'PUT', body: JSON.stringify({ data }) }),
+  settings: {
+    get: () => request<Settings>('/settings'),
+    update: (data: Omit<Settings, 'id'>) =>
+      request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   },
   llmConnections: {
     list: () => request<LlmConnection[]>('/llm-connections'),
@@ -37,12 +37,20 @@ export const api = {
       request<Model>(`/models/${id}`, { method: 'PUT', body: JSON.stringify({ connectionId, name, thinkingMode }) }),
     delete: (id: string) => request<void>(`/models/${id}`, { method: 'DELETE' }),
   },
+  presets: {
+    list: () => request<Preset[]>('/presets'),
+    create: (data: Omit<Preset, 'id'>) =>
+      request<Preset>('/presets', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Omit<Preset, 'id'>) =>
+      request<Preset>(`/presets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/presets/${id}`, { method: 'DELETE' }),
+  },
   connections: {
     list: () => request<Connection[]>('/connections'),
     get: (id: string) => request<Connection>(`/connections/${id}`),
-    create: (data: { type: string; name: string; description: string; modelId: string; config: unknown; profileIds?: string[]; memoryEnabled?: boolean }) =>
+    create: (data: { type: string; name: string; description: string; modelId?: string; presetId?: string; config: unknown; profileIds?: string[]; memoryEnabled?: boolean }) =>
       request<Connection>('/connections', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: { type: string; name: string; description: string; modelId: string; config: unknown; profileIds?: string[]; memoryEnabled?: boolean }) =>
+    update: (id: string, data: { type: string; name: string; description: string; modelId?: string; presetId?: string; config: unknown; profileIds?: string[]; memoryEnabled?: boolean }) =>
       request<Connection>(`/connections/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
     addMemory: (id: string, content: string) =>
@@ -50,14 +58,33 @@ export const api = {
     deleteMemory: (id: string, memoryId: string) =>
       request<void>(`/connections/${id}/memories/${memoryId}`, { method: 'DELETE' }),
   },
-  cronJobs: {
-    list: () => request<CronJob[]>('/cron-jobs'),
-    get: (id: string) => request<CronJob>(`/cron-jobs/${id}`),
-    create: (data: Omit<CronJob, 'id'>) =>
-      request<CronJob>('/cron-jobs', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Omit<CronJob, 'id'>) =>
-      request<CronJob>(`/cron-jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: string) => request<void>(`/cron-jobs/${id}`, { method: 'DELETE' }),
+  skills: {
+    list: (opts?: { connectionId?: string }) => {
+      const qs = new URLSearchParams()
+      if (opts?.connectionId) qs.set('connectionId', opts.connectionId)
+      const q = qs.toString()
+      return request<Skill[]>(`/skills${q ? `?${q}` : ''}`)
+    },
+    create: (data: Omit<Skill, 'id'>) =>
+      request<Skill>('/skills', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Omit<Skill, 'id'>) =>
+      request<Skill>(`/skills/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/skills/${id}`, { method: 'DELETE' }),
+  },
+  plans: {
+    list: () => request<Plan[]>('/plans'),
+    create: (data: Omit<Plan, 'id'>) =>
+      request<Plan>('/plans', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Omit<Plan, 'id'>) =>
+      request<Plan>(`/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/plans/${id}`, { method: 'DELETE' }),
+  },
+  planRuns: {
+    list: (planId: string) => request<PlanRun[]>(`/plans/${planId}/runs`),
+    get: (id: string) => request<PlanRun>(`/plan-runs/${id}`),
+    trigger: (planId: string, input?: Record<string, unknown>) =>
+      request<PlanRun>(`/plans/${planId}/runs`, { method: 'POST', body: JSON.stringify({ input: input ?? {} }) }),
+    cancel: (id: string) => request<PlanRun>(`/plan-runs/${id}/cancel`, { method: 'POST' }),
   },
   guardProfiles: {
     list: () => request<GuardProfile[]>('/guard-profiles'),
@@ -72,7 +99,7 @@ export const api = {
     get: (id: string) => request<Channel>(`/channels/${id}`),
     create: (data: Omit<Channel, 'id'>) =>
       request<Channel>('/channels', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: { name: string; token: string; modelId: string; allowedUserIds: number[] }) =>
+    update: (id: string, data: { name: string; token: string; modelId?: string; presetId?: string; allowedUserIds: number[] }) =>
       request<Channel>(`/channels/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
   },

@@ -19,7 +19,7 @@ func NewGetCurrentSession(store protocols.Store[string, types.ChatSession]) *Get
 func (uc *GetCurrentSession) Execute(ctx context.Context) (types.ChatSession, error) {
 	out, err := uc.policy.Execute(ctx, sessionplugin.Input{
 		Mode:            sessionplugin.ModeLatestOrCreate,
-		ExcludePrefixes: []string{"cron:"},
+		ExcludePrefixes: []string{"plan:"},
 	})
 	if err != nil {
 		return types.ChatSession{}, err

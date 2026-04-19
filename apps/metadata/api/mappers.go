@@ -6,8 +6,16 @@ import (
 	"mantis/core/types"
 )
 
-func toConfigOutput(cfg types.Config) *ConfigOutput {
-	return &ConfigOutput{Body: cfg}
+func toPresetOutput(p types.Preset) *PresetOutput {
+	return &PresetOutput{Body: p}
+}
+
+func toPresetsOutput(items []types.Preset) *PresetsOutput {
+	return &PresetsOutput{Body: items}
+}
+
+func toSettingsOutput(s types.Settings) *SettingsOutput {
+	return &SettingsOutput{Body: s}
 }
 
 func toLlmConnectionOutput(c types.LlmConnection) *LlmConnectionOutput {
@@ -34,8 +42,21 @@ func toConnectionsOutput(items []types.Connection) *ConnectionsOutput {
 	return &ConnectionsOutput{Body: items}
 }
 
-func configDataFromInput(input *UpdateConfigInput) json.RawMessage {
-	return input.Body.Data
+func toSkillOutput(s types.Skill) *SkillOutput {
+	return &SkillOutput{Body: s}
+}
+
+func toSkillsOutput(items []types.Skill) *SkillsOutput {
+	return &SkillsOutput{Body: items}
+}
+
+func settingsFromInput(input *UpdateSettingsInput) types.Settings {
+	return types.Settings{
+		ChatPresetID:   input.Body.ChatPresetID,
+		ServerPresetID: input.Body.ServerPresetID,
+		MemoryEnabled:  input.Body.MemoryEnabled,
+		UserMemories:   input.Body.UserMemories,
+	}
 }
 
 func llmConnectionFromCreateInput(input *CreateLlmConnectionInput) (string, string, string, string) {
@@ -54,36 +75,80 @@ func modelFromUpdateInput(input *UpdateModelInput) (string, string, string, stri
 	return input.ID, input.Body.ConnectionID, input.Body.Name, input.Body.ThinkingMode
 }
 
-func connectionFromCreateInput(input *CreateConnectionInput) (string, string, string, string, json.RawMessage, []string, bool) {
+func connectionFromCreateInput(input *CreateConnectionInput) (string, string, string, string, string, json.RawMessage, []string, bool) {
 	memoryEnabled := true
 	if input.Body.MemoryEnabled != nil {
 		memoryEnabled = *input.Body.MemoryEnabled
 	}
-	return input.Body.Type, input.Body.Name, input.Body.Description, input.Body.ModelID, input.Body.Config, input.Body.ProfileIDs, memoryEnabled
+	return input.Body.Type, input.Body.Name, input.Body.Description, input.Body.ModelID, input.Body.PresetID, input.Body.Config, input.Body.ProfileIDs, memoryEnabled
 }
 
-func connectionFromUpdateInput(input *UpdateConnectionInput) (string, string, string, string, string, json.RawMessage, []string, bool) {
+func connectionFromUpdateInput(input *UpdateConnectionInput) (string, string, string, string, string, string, json.RawMessage, []string, bool) {
 	memoryEnabled := true
 	if input.Body.MemoryEnabled != nil {
 		memoryEnabled = *input.Body.MemoryEnabled
 	}
-	return input.ID, input.Body.Type, input.Body.Name, input.Body.Description, input.Body.ModelID, input.Body.Config, input.Body.ProfileIDs, memoryEnabled
+	return input.ID, input.Body.Type, input.Body.Name, input.Body.Description, input.Body.ModelID, input.Body.PresetID, input.Body.Config, input.Body.ProfileIDs, memoryEnabled
 }
 
-func toCronJobOutput(j types.CronJob) *CronJobOutput {
-	return &CronJobOutput{Body: j}
+func skillFromCreateInput(input *CreateSkillInput) types.Skill {
+	return types.Skill{
+		ConnectionID: input.Body.ConnectionID,
+		Name:         input.Body.Name,
+		Description:  input.Body.Description,
+		Parameters:   input.Body.Parameters,
+		Script:       input.Body.Script,
+	}
 }
 
-func toCronJobsOutput(items []types.CronJob) *CronJobsOutput {
-	return &CronJobsOutput{Body: items}
+func skillFromUpdateInput(input *UpdateSkillInput) types.Skill {
+	return types.Skill{
+		ID:           input.ID,
+		ConnectionID: input.Body.ConnectionID,
+		Name:         input.Body.Name,
+		Description:  input.Body.Description,
+		Parameters:   input.Body.Parameters,
+		Script:       input.Body.Script,
+	}
 }
 
-func cronJobFromCreateInput(input *CreateCronJobInput) (string, string, string, bool) {
-	return input.Body.Name, input.Body.Schedule, input.Body.Prompt, input.Body.Enabled
+func toPlanOutput(p types.Plan) *PlanOutput {
+	return &PlanOutput{Body: p}
 }
 
-func cronJobFromUpdateInput(input *UpdateCronJobInput) (string, string, string, string, bool) {
-	return input.ID, input.Body.Name, input.Body.Schedule, input.Body.Prompt, input.Body.Enabled
+func toPlansOutput(items []types.Plan) *PlansOutput {
+	return &PlansOutput{Body: items}
+}
+
+func planFromCreateInput(input *CreatePlanInput) types.Plan {
+	return types.Plan{
+		Name:        input.Body.Name,
+		Description: input.Body.Description,
+		Schedule:    input.Body.Schedule,
+		Enabled:     input.Body.Enabled,
+		Parameters:  input.Body.Parameters,
+		Graph:       input.Body.Graph,
+	}
+}
+
+func planFromUpdateInput(input *UpdatePlanInput) types.Plan {
+	return types.Plan{
+		ID:          input.ID,
+		Name:        input.Body.Name,
+		Description: input.Body.Description,
+		Schedule:    input.Body.Schedule,
+		Enabled:     input.Body.Enabled,
+		Parameters:  input.Body.Parameters,
+		Graph:       input.Body.Graph,
+	}
+}
+
+func toPlanRunOutput(r types.PlanRun) *PlanRunOutput {
+	return &PlanRunOutput{Body: r}
+}
+
+func toPlanRunsOutput(items []types.PlanRun) *PlanRunsOutput {
+	return &PlanRunsOutput{Body: items}
 }
 
 func toGuardProfileOutput(p types.GuardProfile) *GuardProfileOutput {
@@ -110,10 +175,10 @@ func toChannelsOutput(items []types.Channel) *ChannelsOutput {
 	return &ChannelsOutput{Body: items}
 }
 
-func channelFromCreateInput(input *CreateChannelInput) (string, string, string, string, []int64) {
-	return input.Body.Type, input.Body.Name, input.Body.Token, input.Body.ModelID, input.Body.AllowedUserIDs
+func channelFromCreateInput(input *CreateChannelInput) (string, string, string, string, string, []int64) {
+	return input.Body.Type, input.Body.Name, input.Body.Token, input.Body.ModelID, input.Body.PresetID, input.Body.AllowedUserIDs
 }
 
-func channelFromUpdateInput(input *UpdateChannelInput) (string, string, string, string, []int64) {
-	return input.ID, input.Body.Name, input.Body.Token, input.Body.ModelID, input.Body.AllowedUserIDs
+func channelFromUpdateInput(input *UpdateChannelInput) (string, string, string, string, string, []int64) {
+	return input.ID, input.Body.Name, input.Body.Token, input.Body.ModelID, input.Body.PresetID, input.Body.AllowedUserIDs
 }

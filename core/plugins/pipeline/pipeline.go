@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,12 +50,13 @@ type MemoryExtractor interface {
 }
 
 type RequestHandlePipeline struct {
-	agent            *agents.MantisAgent
-	buffer           *shared.Buffer
-	messageStore     protocols.Store[string, types.ChatMessage]
-	modelStore       protocols.Store[string, types.Model]
-	modelResolver    *modelplugin.Resolver
-	memoryExtractor  MemoryExtractor
+	agent           *agents.MantisAgent
+	buffer          *shared.Buffer
+	messageStore    protocols.Store[string, types.ChatMessage]
+	modelStore      protocols.Store[string, types.Model]
+	modelResolver   *modelplugin.Resolver
+	memoryExtractor MemoryExtractor
+	attachmentDir   string
 }
 
 func New(
@@ -74,6 +77,10 @@ func New(
 	}
 }
 
+func (p *RequestHandlePipeline) SetAttachmentDir(dir string) {
+	p.attachmentDir = dir
+}
+
 func (p *RequestHandlePipeline) Execute(ctx context.Context, in Input) Result {
 	if in.Finally != nil {
 		defer in.Finally()
@@ -92,8 +99,13 @@ func (p *RequestHandlePipeline) Execute(ctx context.Context, in Input) Result {
 	if modelID == "" {
 		return p.fail(ctx, in, fmt.Errorf("model not configured"))
 	}
+	in.Message.ModelID = modelID
+	in.Message.PresetID = strings.TrimSpace(modelOut.PresetID)
+	in.Message.PresetName = strings.TrimSpace(modelOut.PresetName)
+	in.Message.ModelRole = strings.TrimSpace(modelOut.ModelRole)
 
 	if model, err := shared.ResolveModel(ctx, p.modelStore, modelID); err == nil {
+		in.Message.ModelID = model.ID
 		in.Message.ModelName = model.Name
 	}
 
@@ -115,6 +127,10 @@ func (p *RequestHandlePipeline) Execute(ctx context.Context, in Input) Result {
 		DisableHistory: in.DisableHistory,
 	})
 
+	if p.buffer != nil {
+		p.buffer.SetSessionID(in.Message.ID, in.SessionID)
+	}
+
 	var content string
 	var steps []types.Step
 	if runErr == nil && stream != nil {
@@ -122,6 +138,21 @@ func (p *RequestHandlePipeline) Execute(ctx context.Context, in Input) Result {
 	}
 
 	msg := p.finalizeMessage(in.Message, content, steps, runErr, in.ErrorPrefix)
+
+	outgoing := p.collectOutgoing(in.Message.ID, in.Artifacts)
+
+	if len(outgoing) > 0 {
+		for _, f := range outgoing {
+			msg.Attachments = append(msg.Attachments, types.Attachment{
+				ID:       f.ArtifactID,
+				FileName: f.FileName,
+				MimeType: f.MimeType,
+				Size:     int64(len(f.Data)),
+			})
+		}
+		p.persistAttachments(outgoing)
+	}
+
 	p.saveMessage(msg)
 
 	if p.memoryExtractor != nil && msg.Status != "error" && in.Content != "" && msg.Content != "" {
@@ -129,7 +160,6 @@ func (p *RequestHandlePipeline) Execute(ctx context.Context, in Input) Result {
 		go p.memoryExtractor.Extract(context.Background(), in.Content, msg.Content, sshSteps)
 	}
 
-	outgoing := p.collectOutgoing(in.Message.ID, in.Artifacts)
 	sendErr := p.send(ctx, in.ResponseTo, msg.Content, steps, outgoing)
 
 	p.cleanBuffer(in.Message.ID)
@@ -172,7 +202,11 @@ func (p *RequestHandlePipeline) collectStream(requestID string, stream <-chan ty
 		case "tool_meta":
 			if idx, ok := stepIdx[event.ToolID]; ok {
 				steps[idx].LogID = event.LogID
+				steps[idx].ModelID = event.ModelID
 				steps[idx].ModelName = event.ModelName
+				steps[idx].PresetID = event.PresetID
+				steps[idx].PresetName = event.PresetName
+				steps[idx].ModelRole = event.ModelRole
 				if p.buffer != nil {
 					p.buffer.SetStep(requestID, steps[idx])
 				}
@@ -182,7 +216,11 @@ func (p *RequestHandlePipeline) collectStream(requestID string, stream <-chan ty
 				steps[idx].Status = "completed"
 				steps[idx].Result = event.Delta
 				steps[idx].LogID = event.LogID
+				steps[idx].ModelID = event.ModelID
 				steps[idx].ModelName = event.ModelName
+				steps[idx].PresetID = event.PresetID
+				steps[idx].PresetName = event.PresetName
+				steps[idx].ModelRole = event.ModelRole
 				steps[idx].FinishedAt = time.Now().UTC().Format(time.RFC3339)
 				if p.buffer != nil {
 					p.buffer.SetStep(requestID, steps[idx])
@@ -247,10 +285,11 @@ func (p *RequestHandlePipeline) collectOutgoing(requestID string, artifacts *sha
 			name = "attachment"
 		}
 		files = append(files, protocols.FileAttachment{
-			FileName: name,
-			MimeType: a.MIME,
-			Data:     a.Bytes,
-			Caption:  q.Caption,
+			ArtifactID: q.ArtifactID,
+			FileName:   name,
+			MimeType:   a.MIME,
+			Data:       a.Bytes,
+			Caption:    q.Caption,
 		})
 	}
 	return files
@@ -287,6 +326,28 @@ func collectSSHSteps(steps []types.Step) []SSHStep {
 		out = append(out, SSHStep{ToolName: s.Tool, Task: args.Task, Result: s.Result})
 	}
 	return out
+}
+
+func (p *RequestHandlePipeline) persistAttachments(files []protocols.FileAttachment) {
+	if p.attachmentDir == "" {
+		return
+	}
+	if err := os.MkdirAll(p.attachmentDir, 0755); err != nil {
+		log.Printf("pipeline: mkdir attachments: %v", err)
+		return
+	}
+	for _, f := range files {
+		if f.ArtifactID == "" || len(f.Data) == 0 {
+			continue
+		}
+		dataPath := filepath.Join(p.attachmentDir, f.ArtifactID)
+		if err := os.WriteFile(dataPath, f.Data, 0644); err != nil {
+			log.Printf("pipeline: write attachment %s: %v", f.ArtifactID, err)
+			continue
+		}
+		meta, _ := json.Marshal(map[string]string{"mime": f.MimeType, "name": f.FileName})
+		_ = os.WriteFile(dataPath+".json", meta, 0644)
+	}
 }
 
 func (p *RequestHandlePipeline) cleanBuffer(requestID string) {

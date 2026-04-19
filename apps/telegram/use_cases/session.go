@@ -32,7 +32,7 @@ func (uc *Session) Execute(ctx context.Context, mode SessionMode) (string, error
 	case SessionModeGetOrCreate:
 		out, err := uc.policy.Execute(ctx, sessionplugin.Input{
 			Mode:            sessionplugin.ModeLatestOrCreate,
-			ExcludePrefixes: []string{"cron:"},
+			ExcludePrefixes: []string{"plan:"},
 		})
 		if err != nil {
 			fallback, ferr := uc.policy.Execute(ctx, sessionplugin.Input{Mode: sessionplugin.ModeCreateNew})

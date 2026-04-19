@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -17,9 +19,9 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 
 	"mantis/apps/chat"
-	"mantis/apps/cron"
 	"mantis/apps/logs"
 	"mantis/apps/metadata"
+	plansapp "mantis/apps/plans"
 	"mantis/apps/telegram"
 	"mantis/core/agents"
 	artifactplugin "mantis/core/plugins/artifact"
@@ -46,11 +48,11 @@ func main() {
 	db := bun.NewDB(sqldb, pgdialect.New())
 	defer db.Close()
 
-	configStore := store.NewPostgres[string, types.Config, models.ConfigRow](
+	settingsStore := store.NewPostgres[string, types.Settings, models.SettingsRow](
 		db,
-		func(c types.Config) string { return c.ID },
-		mappers.ConfigToRow,
-		mappers.ConfigFromRow,
+		func(s types.Settings) string { return s.ID },
+		mappers.SettingsToRow,
+		mappers.SettingsFromRow,
 	)
 	llmConnStore := store.NewPostgres[string, types.LlmConnection, models.LlmConnectionRow](
 		db,
@@ -64,19 +66,36 @@ func main() {
 		mappers.ModelToRow,
 		mappers.ModelFromRow,
 	)
+	presetStore := store.NewPostgres[string, types.Preset, models.PresetRow](
+		db,
+		func(p types.Preset) string { return p.ID },
+		mappers.PresetToRow,
+		mappers.PresetFromRow,
+	)
 	connectionStore := store.NewPostgres[string, types.Connection, models.ConnectionRow](
 		db,
 		func(c types.Connection) string { return c.ID },
 		mappers.ConnectionToRow,
 		mappers.ConnectionFromRow,
 	)
-	cronJobStore := store.NewPostgres[string, types.CronJob, models.CronJobRow](
+	skillStore := store.NewPostgres[string, types.Skill, models.SkillRow](
 		db,
-		func(j types.CronJob) string { return j.ID },
-		mappers.CronJobToRow,
-		mappers.CronJobFromRow,
+		func(s types.Skill) string { return s.ID },
+		mappers.SkillToRow,
+		mappers.SkillFromRow,
 	)
-
+	planStore := store.NewPostgres[string, types.Plan, models.PlanRow](
+		db,
+		func(p types.Plan) string { return p.ID },
+		mappers.PlanToRow,
+		mappers.PlanFromRow,
+	)
+	planRunStore := store.NewPostgres[string, types.PlanRun, models.PlanRunRow](
+		db,
+		func(r types.PlanRun) string { return r.ID },
+		mappers.PlanRunToRow,
+		mappers.PlanRunFromRow,
+	)
 	sessionStore := store.NewPostgres[string, types.ChatSession, models.ChatSessionRow](
 		db,
 		func(s types.ChatSession) string { return s.ID },
@@ -127,22 +146,56 @@ func main() {
 	}
 
 	visionAdapter := llm.NewVision()
-	mantisAgent := agents.NewMantisAgent(messageStore, modelStore, llmConnStore, connectionStore, cronJobStore, configStore, openaiAdapter, commandGuard, sessionLogger, asrAdapter, ocrAdapter, visionAdapter)
+	mantisAgent := agents.NewMantisAgent(messageStore, modelStore, presetStore, llmConnStore, connectionStore, skillStore, planStore, channelStore, settingsStore, openaiAdapter, commandGuard, sessionLogger, asrAdapter, ocrAdapter, visionAdapter)
 
 	buf := shared.NewBuffer()
 	artifactMgr := artifactplugin.NewManager(artifactadapter.NewInMemorySessionStorage())
-	memoryExtractor := memory.NewExtractor(openaiAdapter, configStore, connectionStore, modelStore, llmConnStore)
+	memoryExtractor := memory.NewExtractor(openaiAdapter, settingsStore, connectionStore, modelStore, presetStore, llmConnStore)
 
-	metadataApp := metadata.NewApp(configStore, llmConnStore, modelStore, connectionStore, cronJobStore, guardProfileStore, channelStore)
-	chatApp := chat.NewApp(sessionStore, messageStore, modelStore, channelStore, configStore, mantisAgent, buf, artifactMgr, memoryExtractor)
+	attachmentDir := env("ATTACHMENT_DIR", "/data/attachments")
+
+	plansApp := plansapp.NewApp(settingsStore, sessionStore, messageStore, modelStore, presetStore, planStore, planRunStore, mantisAgent, artifactMgr, memoryExtractor, buf)
+	mantisAgent.SetPlanRunner(plansApp.Runner())
+
+	metadataApp := metadata.NewApp(settingsStore, llmConnStore, modelStore, presetStore, connectionStore, skillStore, planStore, planRunStore, plansApp.Runner(), guardProfileStore, channelStore)
+	chatApp := chat.NewApp(sessionStore, messageStore, modelStore, presetStore, channelStore, settingsStore, mantisAgent, buf, artifactMgr, memoryExtractor)
 	logsApp := logs.NewApp(logStore)
-	telegramApp := telegram.NewApp(channelStore, sessionStore, messageStore, modelStore, mantisAgent, buf, artifactMgr, asrAdapter, ttsAdapter, memoryExtractor)
-	cronApp := cron.NewApp(configStore, channelStore, sessionStore, messageStore, modelStore, cronJobStore, mantisAgent, artifactMgr, memoryExtractor)
+	telegramApp := telegram.NewApp(channelStore, sessionStore, messageStore, modelStore, presetStore, settingsStore, mantisAgent, buf, artifactMgr, asrAdapter, ttsAdapter, memoryExtractor)
+
+	chatApp.SetAttachmentDir(attachmentDir)
+	plansApp.SetAttachmentDir(attachmentDir)
 
 	go telegramApp.Start(context.Background())
-	go cronApp.Start(context.Background())
+	go plansApp.Start(context.Background())
 
 	r := chi.NewMux()
+
+	r.Get("/api/artifacts/{sessionId}/{artifactId}", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := chi.URLParam(r, "sessionId")
+		artifactID := chi.URLParam(r, "artifactId")
+
+		store := artifactMgr.ForSession(sessionID)
+		if a, ok := store.Get(artifactID); ok {
+			serveBinary(w, a.Bytes, a.MIME, a.Name)
+			return
+		}
+
+		dataPath := filepath.Join(attachmentDir, artifactID)
+		data, err := os.ReadFile(dataPath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		var meta struct {
+			MIME string `json:"mime"`
+			Name string `json:"name"`
+		}
+		if raw, err := os.ReadFile(dataPath + ".json"); err == nil {
+			_ = json.Unmarshal(raw, &meta)
+		}
+		serveBinary(w, data, meta.MIME, meta.Name)
+	})
+
 	api := humachi.New(r, huma.DefaultConfig("Mantis API", "1.0.0"))
 	metadataApp.Register(api)
 	chatApp.Register(api)
@@ -158,4 +211,16 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func serveBinary(w http.ResponseWriter, data []byte, mime, name string) {
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "private, max-age=1800")
+	if name != "" {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", name))
+	}
+	w.Write(data)
 }

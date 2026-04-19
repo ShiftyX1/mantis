@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, Pencil, Trash2, Radio } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../api'
-import type { Channel, Model } from '../types'
+import type { Channel, Preset } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -23,19 +23,19 @@ function parseAllowedUserIds(s: string): number[] {
 
 export default function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([])
-  const [models, setModels] = useState<Model[]>([])
+  const [presets, setPresets] = useState<Preset[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Channel | null>(null)
-  const [form, setForm] = useState({ name: '', token: '', modelId: '', allowedUserIds: '' })
+  const [form, setForm] = useState({ name: '', token: '', presetId: '', allowedUserIds: '' })
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       setLoading(true)
-      const [chs, mdls] = await Promise.all([api.channels.list(), api.models.list()])
+      const [chs, p] = await Promise.all([api.channels.list(), api.presets.list()])
       setChannels(chs)
-      setModels(mdls)
+      setPresets(p)
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -45,26 +45,20 @@ export default function ChannelsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const openCreate = () => {
-    setEditing(null)
-    setForm({ name: '', token: '', modelId: '', allowedUserIds: '' })
-    setModalOpen(true)
-  }
-
   const openEdit = (c: Channel) => {
     setEditing(c)
     setForm({
       name: c.name,
       token: c.token,
-      modelId: c.modelId,
+      presetId: c.presetId ?? '',
       allowedUserIds: (c.allowedUserIds ?? []).join(','),
     })
     setModalOpen(true)
   }
 
-  const modelName = (id: string) => {
-    const m = models.find(x => x.id === id)
-    if (m) return `${m.name} (${m.connectionId})`
+  const presetName = (id: string) => {
+    const p = presets.find(x => x.id === id)
+    if (p) return p.name
     return id ? (id.slice(0, 8) + '...') : '—'
   }
 
@@ -74,10 +68,10 @@ export default function ChannelsPage() {
       if (editing) {
         const token = editing.type === 'chat' ? '' : form.token
         const allowedUserIds = editing.type === 'chat' ? [] : allowed
-        await api.channels.update(editing.id, { name: form.name, token, modelId: form.modelId, allowedUserIds })
+        await api.channels.update(editing.id, { name: form.name, token, presetId: form.presetId, allowedUserIds })
         toast.success('Channel updated')
       } else {
-        await api.channels.create({ type: 'telegram', name: form.name, token: form.token, modelId: form.modelId, allowedUserIds: allowed })
+        await api.channels.create({ type: 'telegram', name: form.name, token: form.token, modelId: '', presetId: form.presetId, allowedUserIds: allowed })
         toast.success('Channel created')
       }
       setModalOpen(false)
@@ -99,15 +93,18 @@ export default function ChannelsPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Channels</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-600 mt-0.5">Chat channel is default; Telegram channels can be added</p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus size={14} /> Add Telegram Channel
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" disabled className="opacity-50 cursor-not-allowed">
+            <Plus size={14} /> Add Channel
+          </Button>
+          <span className="text-[11px] text-zinc-400 dark:text-zinc-600">Coming soon</span>
+        </div>
       </div>
 
       {loading ? (
@@ -121,7 +118,7 @@ export default function ChannelsPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Model</TableHead>
+                <TableHead>Preset</TableHead>
                 <TableHead>Token</TableHead>
                 <TableHead>Allowed</TableHead>
                 <TableHead className="w-24" />
@@ -137,7 +134,7 @@ export default function ChannelsPage() {
                   <TableCell>
                     <Badge className="uppercase">{ch.type}</Badge>
                   </TableCell>
-                  <TableCell className="text-zinc-600 dark:text-zinc-400 text-sm">{modelName(ch.modelId)}</TableCell>
+                  <TableCell className="text-zinc-600 dark:text-zinc-400 text-sm">{ch.presetId ? presetName(ch.presetId) : <span className="text-zinc-400 italic">Inherit</span>}</TableCell>
                   <TableCell className="text-zinc-500">{ch.token ? 'set' : '—'}</TableCell>
                   <TableCell className="text-zinc-500">{(ch.allowedUserIds ?? []).length || '—'}</TableCell>
                   <TableCell>
@@ -184,15 +181,15 @@ export default function ChannelsPage() {
               </FormField>
             )}
 
-            <FormField label="Model">
+            <FormField label="Preset">
               <select
-                value={form.modelId}
-                onChange={e => setForm(f => ({ ...f, modelId: e.target.value }))}
+                value={form.presetId}
+                onChange={e => setForm(f => ({ ...f, presetId: e.target.value }))}
                 className="flex w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-teal-500/50"
               >
-                <option value="">Select model...</option>
-                {models.map(m => (
-                  <option key={m.id} value={m.id}>{m.name} ({m.connectionId})</option>
+                <option value="">Inherit (use global default)</option>
+                {presets.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </FormField>
@@ -210,7 +207,7 @@ export default function ChannelsPage() {
 
             <DialogFooter>
               <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-              <Button onClick={submit} disabled={!form.modelId || (!editing && !form.token)}>
+              <Button onClick={submit} disabled={!editing && !form.token}>
                 {editing ? 'Update' : 'Create'}
               </Button>
             </DialogFooter>

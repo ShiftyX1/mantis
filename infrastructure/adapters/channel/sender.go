@@ -144,7 +144,7 @@ func formatStepLine(step types.Step, useHTML bool) string {
 	if useHTML {
 		label = "<b>" + html.EscapeString(label) + "</b>"
 	}
-	return "🔧 " + label
+	return "> " + label
 }
 
 func interleavedText(content string, steps []types.Step, useHTML bool) string {

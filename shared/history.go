@@ -16,8 +16,8 @@ func BuildHistory(ctx context.Context, store protocols.Store[string, types.ChatM
 		return nil, err
 	}
 
-	includeCron := !strings.HasPrefix(sessionID, "cron:")
-	cronCutoff := time.Now().Add(-24 * time.Hour)
+	includePlans := !strings.HasPrefix(sessionID, "plan:")
+	planCutoff := time.Now().Add(-24 * time.Hour)
 
 	var session []types.ChatMessage
 	for _, m := range all {
@@ -28,7 +28,7 @@ func BuildHistory(ctx context.Context, store protocols.Store[string, types.ChatM
 			session = append(session, m)
 			continue
 		}
-		if includeCron && strings.HasPrefix(m.SessionID, "cron:") && m.CreatedAt.After(cronCutoff) {
+		if includePlans && strings.HasPrefix(m.SessionID, "plan:") && m.CreatedAt.After(planCutoff) {
 			session = append(session, m)
 		}
 	}

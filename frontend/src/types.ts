@@ -5,9 +5,12 @@ export interface LlmConnection {
   apiKey: string
 }
 
-export interface Config {
+export interface Settings {
   id: string
-  data: Record<string, unknown>
+  chatPresetId: string
+  serverPresetId: string
+  memoryEnabled: boolean
+  userMemories: string[]
 }
 
 export interface Model {
@@ -17,18 +20,21 @@ export interface Model {
   thinkingMode: '' | 'skip' | 'inline'
 }
 
+export interface Preset {
+  id: string
+  name: string
+  chatModelId: string
+  summaryModelId: string
+  imageModelId: string
+  fallbackModelId: string
+  temperature: number | null
+  systemPrompt: string
+}
+
 export interface Memory {
   id: string
   content: string
   createdAt: string
-}
-
-export interface CronJob {
-  id: string
-  name: string
-  schedule: string
-  prompt: string
-  enabled: boolean
 }
 
 export interface Connection {
@@ -37,10 +43,80 @@ export interface Connection {
   name: string
   description: string
   modelId: string
+  presetId: string
   config: Record<string, unknown>
   memories: Memory[]
   profileIds: string[]
   memoryEnabled: boolean
+}
+
+export interface Skill {
+  id: string
+  connectionId: string
+  name: string
+  description: string
+  parameters: Record<string, unknown>
+  script: string
+}
+
+export interface PlanNodePosition {
+  x: number
+  y: number
+}
+
+export interface PlanNode {
+  id: string
+  type: 'action' | 'decision'
+  label: string
+  prompt: string
+  position: PlanNodePosition
+  clearContext?: boolean
+  maxRetries?: number
+}
+
+export interface PlanEdge {
+  id: string
+  source: string
+  target: string
+  label: string
+}
+
+export interface PlanGraph {
+  nodes: PlanNode[]
+  edges: PlanEdge[]
+}
+
+export interface Plan {
+  id: string
+  name: string
+  description: string
+  schedule: string
+  enabled: boolean
+  parameters: Record<string, unknown>
+  graph: PlanGraph
+}
+
+export type PlanRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'paused'
+export type PlanStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
+
+export interface PlanStepRun {
+  nodeId: string
+  status: PlanStepStatus
+  result?: string
+  messageId?: string
+  startedAt?: string
+  finishedAt?: string
+}
+
+export interface PlanRun {
+  id: string
+  planId: string
+  status: PlanRunStatus
+  trigger: 'manual' | 'schedule'
+  input: Record<string, unknown>
+  steps: PlanStepRun[]
+  startedAt: string
+  finishedAt?: string
 }
 
 export interface GuardCapabilities {
@@ -79,12 +155,15 @@ export interface Channel {
   name: string
   token: string
   modelId: string
+  presetId: string
   allowedUserIds: number[]
 }
 
 export interface ChatSession {
   id: string
   title: string
+  source?: string
+  active?: boolean
   createdAt: string
 }
 
@@ -97,10 +176,21 @@ export interface Step {
   status: 'running' | 'completed' | 'error'
   result?: string
   logId?: string
+  modelId?: string
   modelName?: string
+  presetId?: string
+  presetName?: string
+  modelRole?: string
   contentOffset?: number
   startedAt: string
   finishedAt?: string
+}
+
+export interface Attachment {
+  id: string
+  fileName: string
+  mimeType: string
+  size: number
 }
 
 export interface ChatMessage {
@@ -110,8 +200,13 @@ export interface ChatMessage {
   content: string
   status: string
   source?: string
+  modelId?: string
   modelName?: string
+  presetId?: string
+  presetName?: string
+  modelRole?: string
   steps?: Step[]
+  attachments?: Attachment[]
   createdAt: string
 }
 
@@ -127,6 +222,11 @@ export interface SessionLog {
   agentName: string
   prompt: string
   status: 'running' | 'finished'
+  modelId?: string
+  modelName?: string
+  presetId?: string
+  presetName?: string
+  modelRole?: string
   entries: LogEntry[]
   startedAt: string
   finishedAt?: string
